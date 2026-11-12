@@ -1,6 +1,6 @@
 # Progress
 
-We work through this one item at a time: verify it, commit, tick it off, then clear context.
+We work through this in small batches: take the next unchecked item plus any small items that use the same code (2–3 at most), verify, commit, tick them off, then clear context. Bigger or unrelated items (Deadlines, README, Live AMC API) get a session each. Prefer a reusable verification script over one-off curl checks.
 The original design is summarized at the bottom.
 
 ## Checklist
