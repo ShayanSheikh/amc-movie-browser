@@ -7,8 +7,9 @@ The original design is summarized at the bottom.
 
 - [x] **Build check**: `tsc`, `eslint`, 12/12 vitest, `next build` all clean; prod server serves every page, `/api/cron/poll` returns 401 without the secret.
 - [x] **Favorite theatres**: `npm run dev`, search on /theatres (mock: `62701`, `Springfield`, `Chicago`), star/unstar, favorites list updates. Verified against a dev server: `62701` returns Riverside/Downtown/Northgate (mock zip search matches the first 3 digits), `Springfield` returns 2, `Chicago` returns 1, a nonsense query shows the empty state, star/unstar toggles the button and the "Your theatres" list.
-- [ ] **Watchlist**: /movies, Watch/unwatch from Now playing + Coming soon, save notes, dashboard shows the movie.
-- [ ] **New-showtime alerts**: Check now (first poll seeds silently, no alerts), Settings → Advance mock step → Check now → "Tickets are up: Glass Meridian" alert in-app. Then paste a real Discord/Slack webhook, Send test, confirm delivery.
+- [x] **Watchlist**: /movies, Watch/unwatch from Now playing + Coming soon, save notes, dashboard shows the movie. Covered by `npm run verify`.
+- [x] **New-showtime alerts**: Check now (first poll seeds silently, no alerts), Settings → Advance mock step → Check now → "Tickets are up: Glass Meridian" alert in-app, Send test, delivery to a local fake webhook, re-poll adds nothing, Clear. Covered by `npm run verify`.
+  - [ ] Real webhook (needs the user's URL): `WEBHOOK_URL=https://discord.com/api/webhooks/... npm run verify`, then confirm the test message and the Glass Meridian alert show up in the channel.
 - [ ] **Programming deadlines**: add a deadline for Paper Comets (only plays at AMC Harborview 8). Check it goes Programmed when that theatre is a favorite, and "Likely not programmed" after the date passes without it.
 - [ ] **README**: setup, mock mode, going live, webhooks, cron hosting.
 - [ ] **Live AMC API** (blocked until the key is active): `AMC_API_KEY=... npm run amc:smoke -- <zip>`, fix `ENDPOINTS` in `src/lib/amc/httpClient.ts` and the zod schemas in `src/lib/amc/types.ts`.
@@ -21,6 +22,7 @@ The original design is summarized at the bottom.
 - DB: SQLite at `./data/app.db` (gitignored). Delete it to start fresh. Migrations are in `./drizzle` and run at startup.
 - The scheduler runs from `src/instrumentation.ts`. `DISABLE_SCHEDULER=1` turns it off.
 - Testing server actions without a browser: each `<form>` renders a hidden `$ACTION_ID_<hash>` input. POST multipart to the page with that field plus the form fields, e.g. `curl -F '$ACTION_ID_<hash>=' -F 'theatre={...}' localhost:3000/theatres`. Point `DATABASE_URL` at a scratch file so the real DB isn't touched.
+- `npm run verify` (`scripts/verify-flows.mjs`) starts `next dev` on :3100 with a scratch DB and mock mode, drives the server actions like the forms do, and checks the pages (~1 min). Extend it for new flows (e.g. Deadlines) instead of writing one-off curl checks. Non-form actions are called by name via `.next/server/server-reference-manifest.json`.
 - Main logic is in `src/lib/poll/runPoll.ts`, with tests in `runPoll.test.ts`.
 
 ## Design summary
