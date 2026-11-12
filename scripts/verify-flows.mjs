@@ -210,6 +210,48 @@ try {
 
   await submit("/", buttonForm("Clear"));
   check("Clear empties the feed", (await alertFeed()).includes("No alerts yet"));
+
+  section("Programming deadlines");
+  // Paper Comets only ever plays at AMC Harborview 8 (release +5 days, so it needs mock step >= 1, set above).
+  const localDate = (offset) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const pills = async () => {
+    const t = text(await page("/movies"));
+    const count = (label) => (t.match(new RegExp(`${label} by `, "g")) ?? []).length;
+    return { waiting: count("Waiting"), met: count("Programmed"), missed: count("Likely not programmed") };
+  };
+  const deadlineForm = (f) => f.fields.movieId === "72002" && "deadlineDate" in f.fields;
+
+  await submit("/movies", movieForm("Paper Comets"));
+  await submit("/movies", deadlineForm, { deadlineDate: localDate(14), theatreId: "any" });
+  await submit("/movies", deadlineForm, { deadlineDate: localDate(-1), theatreId: "any" });
+  let p = await pills();
+  check("two deadlines added, both Waiting", p.waiting === 2 && p.met === 0 && p.missed === 0, JSON.stringify(p));
+  check("deadline shows on the dashboard", text(await page("/")).includes("Waiting by"));
+
+  await submit("/", buttonForm("Check now"));
+  p = await pills();
+  check("past deadline -> Likely not programmed (Harborview not a favorite)", p.missed === 1, JSON.stringify(p));
+  check("future deadline stays Waiting", p.waiting === 1, JSON.stringify(p));
+  let feed3 = await alertFeed();
+  check('"still no showtimes" alert', feed3.includes("Paper Comets: still no showtimes at your favorite theatres"), feed3.slice(0, 400));
+
+  await submit("/theatres?q=Harborview", (f) => f.fields.theatre && JSON.parse(f.fields.theatre).id === 9003);
+  await submit("/", buttonForm("Check now"));
+  p = await pills();
+  check("starring Harborview -> future deadline Programmed", p.met === 1 && p.waiting === 0 && p.missed === 1, JSON.stringify(p));
+  feed3 = await alertFeed();
+  check('"is programmed" alert', feed3.includes("Paper Comets is programmed at your favorite theatres"), feed3.slice(0, 400));
+  if (!realWebhook) {
+    check("deadline alerts delivered to webhook", ["deadline_met", "deadline_missed"].every((k) => received.some((b) => b.kind === k)), JSON.stringify(received.map((b) => b.kind)));
+  }
+
+  await submit("/movies", (f) => "id" in f.fields && f.text.includes("Remove"));
+  p = await pills();
+  check("Remove deletes a deadline", p.met + p.waiting + p.missed === 1, JSON.stringify(p));
 } catch (err) {
   failures++;
   console.error(`\n✗ ${err.stack || err}`);
