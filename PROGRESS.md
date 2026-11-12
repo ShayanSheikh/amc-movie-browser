@@ -6,7 +6,7 @@ The original design is summarized at the bottom.
 ## Checklist
 
 - [x] **Build check**: `tsc`, `eslint`, 12/12 vitest, `next build` all clean; prod server serves every page, `/api/cron/poll` returns 401 without the secret.
-- [ ] **Favorite theatres**: `npm run dev`, search on /theatres (mock: `62701`, `Springfield`, `Chicago`), star/unstar, favorites list updates.
+- [x] **Favorite theatres**: `npm run dev`, search on /theatres (mock: `62701`, `Springfield`, `Chicago`), star/unstar, favorites list updates. Verified against a dev server: `62701` returns Riverside/Downtown/Northgate (mock zip search matches the first 3 digits), `Springfield` returns 2, `Chicago` returns 1, a nonsense query shows the empty state, star/unstar toggles the button and the "Your theatres" list.
 - [ ] **Watchlist**: /movies, Watch/unwatch from Now playing + Coming soon, save notes, dashboard shows the movie.
 - [ ] **New-showtime alerts**: Check now (first poll seeds silently, no alerts), Settings → Advance mock step → Check now → "Tickets are up: Glass Meridian" alert in-app. Then paste a real Discord/Slack webhook, Send test, confirm delivery.
 - [ ] **Programming deadlines**: add a deadline for Paper Comets (only plays at AMC Harborview 8). Check it goes Programmed when that theatre is a favorite, and "Likely not programmed" after the date passes without it.
@@ -16,9 +16,11 @@ The original design is summarized at the bottom.
 ## Notes for a fresh session
 
 - Node is installed with nvm, so run `. ~/.nvm/nvm.sh` before any `npm`/`npx` command.
+- If `AMC_API_KEY` is exported in your shell, the app goes live and gets a 403 until the key is active. Run with `AMC_MODE=mock npm run dev` to force mock mode.
 - With no `AMC_API_KEY`, the app runs in mock mode (`src/lib/amc/mockClient.ts`). The mock's "release step" lives in settings and is changed from /settings.
 - DB: SQLite at `./data/app.db` (gitignored). Delete it to start fresh. Migrations are in `./drizzle` and run at startup.
 - The scheduler runs from `src/instrumentation.ts`. `DISABLE_SCHEDULER=1` turns it off.
+- Testing server actions without a browser: each `<form>` renders a hidden `$ACTION_ID_<hash>` input. POST multipart to the page with that field plus the form fields, e.g. `curl -F '$ACTION_ID_<hash>=' -F 'theatre={...}' localhost:3000/theatres`. Point `DATABASE_URL` at a scratch file so the real DB isn't touched.
 - Main logic is in `src/lib/poll/runPoll.ts`, with tests in `runPoll.test.ts`.
 
 ## Design summary
