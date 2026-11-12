@@ -1,10 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../../db";
 import { alerts, deadlines, movies, settings, showtimesSeen, theatres, watchlist } from "../../db/schema";
 import { MockAmcClient, MOCK_THEATRES } from "../amc/mockClient";
 import type { AmcClient } from "../amc/client";
 import { runPoll } from "./runPoll";
+import type { PollDeps } from "./runPoll";
+
+type SendFn = NonNullable<PollDeps["send"]>;
 import { addDays, toLocalDate } from "../dates";
 
 const NOW = new Date(2026, 10, 11, 9, 0, 0); // Nov 11 2026, 9:00 local
@@ -16,7 +19,7 @@ const RIVERSIDE = 9001;
 let db: Db;
 let step: number;
 let client: MockAmcClient;
-let send: ReturnType<typeof vi.fn>;
+let send: Mock<SendFn>;
 
 async function seedMovie(id: number) {
   const all = [...(await client.listMovies("now-playing")), ...(await client.listMovies("coming-soon"))];
@@ -36,7 +39,7 @@ beforeEach(() => {
   db = createDb(":memory:");
   step = 0;
   client = new MockAmcClient(() => step, () => NOW);
-  send = vi.fn().mockResolvedValue(undefined);
+  send = vi.fn<SendFn>().mockResolvedValue(undefined);
   db.update(settings).set({ daysAhead: 14 }).run();
 });
 

@@ -53,7 +53,7 @@ export function buildWebhookBody(flavor: WebhookFlavor, kind: AlertKind, p: Aler
         ],
       };
     default:
-      return { title, text: body, kind, ...p };
+      return { ...p, title, text: body, kind };
   }
 }
 
