@@ -11,7 +11,7 @@ The original design is summarized at the bottom.
 - [x] **New-showtime alerts**: Check now (first poll seeds silently, no alerts), Settings → Advance mock step → Check now → "Tickets are up: Glass Meridian" alert in-app, Send test, delivery to a local fake webhook, re-poll adds nothing, Clear. Covered by `npm run verify`.
   - [ ] Real webhook (needs the user's URL): `WEBHOOK_URL=https://discord.com/api/webhooks/... npm run verify`, then confirm the test message and the Glass Meridian alert show up in the channel.
 - [x] **Programming deadlines**: add a deadline for Paper Comets (only plays at AMC Harborview 8). Check it goes Programmed when that theatre is a favorite, and "Likely not programmed" after the date passes without it. Covered by `npm run verify`: two "any favorite" deadlines (today+14 and yesterday, since the form accepts past dates), poll with only Riverside starred, so the past one goes missed with a "still no showtimes" alert and the future one stays Waiting. Then star Harborview and poll, so the future one goes Programmed with an "is programmed" alert. Both alerts reach the webhook, and Remove deletes a deadline.
-- [ ] **README**: setup, mock mode, going live, webhooks, cron hosting.
+- [x] **README**: setup, mock mode, going live, webhooks, cron hosting, env vars, dev/verify commands. Notes that SQLite needs a persistent disk (not Vercel's ephemeral FS) and that `/api/cron/poll` ignores the settings interval.
 - [ ] **Live AMC API** (blocked until the key is active): `AMC_API_KEY=... npm run amc:smoke -- <zip>`, fix `ENDPOINTS` in `src/lib/amc/httpClient.ts` and the zod schemas in `src/lib/amc/types.ts`.
 
 ## Notes for a fresh session
