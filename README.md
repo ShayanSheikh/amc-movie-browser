@@ -40,7 +40,7 @@ If `AMC_API_KEY` is exported in your shell but you want mock data anyway, set `A
    AMC_API_KEY=... npm run amc:smoke -- 10001   # any zip or city
    ```
 
-   It calls each endpoint once and validates the responses. **The endpoint paths have not been checked against the live API yet.** If a step fails, fix the path in `ENDPOINTS` (`src/lib/amc/httpClient.ts`) or the zod schema in `src/lib/amc/types.ts`.
+   It calls each endpoint once and validates the responses. All of them were checked against the live API on 2026-11-13. If a step fails later (AMC changed something), fix the path in `ENDPOINTS` (`src/lib/amc/httpClient.ts`) or the zod schema in `src/lib/amc/types.ts`.
 
 Mind the request budget: each poll makes one request per starred theatre per day ahead (3 theatres × 14 days = 42 requests). The client backs off when AMC returns `429`.
 

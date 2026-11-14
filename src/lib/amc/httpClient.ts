@@ -16,15 +16,14 @@ import {
 /**
  * Real AMC vendor API client.
  *
- * ⚠️ The endpoint paths below are written from memory of AMC's v2 docs and haven't been
- * tested against the live API (the key isn't active yet). Every path is in the
- * ENDPOINTS table so fixing one is a one-line change. Check them with `npm run amc:smoke`.
+ * Every path below was checked against the live API on 2026-11-13 (`npm run amc:smoke`).
+ * They're all in the ENDPOINTS table, so if AMC changes one, the fix is a one-line change.
  */
 export const ENDPOINTS = {
   locationSuggestions: (query: string) =>
     `/v2/location-suggestions/?query=${encodeURIComponent(query)}`,
-  closestTheatres: (lat: number, lng: number) =>
-    `/v2/theatres/views/closest?latitude=${lat}&longitude=${lng}`,
+  // Theatres sorted by distance; each item wraps the theatre in `_embedded.theatre`.
+  locations: (lat: number, lng: number) => `/v2/locations?latitude=${lat}&longitude=${lng}`,
   movies: (list: MovieList) => `/v2/movies/views/${list}`,
   // AMC expects dates as MM-DD-YY in this path.
   showtimes: (theatreId: number, date: string) =>
@@ -36,13 +35,35 @@ export function toAmcDate(date: string): string {
   return `${m}-${d}-${y.slice(2)}`;
 }
 
+const LOCATIONS_REL = "https://api.amctheatres.com/rels/v2/locations";
+
+// Suggestions carry no lat/lng fields; the coordinates are only in the locations link's query string.
 const LocationSuggestionSchema = z.looseObject({
-  name: z.string().optional(),
-  type: z.string().optional(),
-  location: z.looseObject({ latitude: z.number(), longitude: z.number() }).optional(),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
+  title: z.string().optional(),
+  type: z.string().optional(), // "zipcode", "city", "theatre", ...
+  _links: z.record(z.string(), z.looseObject({ href: z.string() })).optional(),
 });
+
+const LocationSchema = z.looseObject({
+  rank: z.number().optional(),
+  distance: z.number().optional(),
+  _embedded: z.looseObject({ theatre: TheatreSchema }),
+});
+
+export function suggestionCoords(s: z.infer<typeof LocationSuggestionSchema>): { lat: number; lng: number } | null {
+  const href = s._links?.[LOCATIONS_REL]?.href;
+  if (!href) return null;
+  const params = new URL(href).searchParams;
+  const lat = Number(params.get("latitude"));
+  const lng = Number(params.get("longitude"));
+  return params.has("latitude") && params.has("longitude") && Number.isFinite(lat) && Number.isFinite(lng)
+    ? { lat, lng }
+    : null;
+}
+
+/** A city name matches one suggestion per theatre, all in different places, so search near a few of them. */
+const MAX_SUGGESTIONS = 3;
+const THEATRES_PER_SUGGESTION = 20;
 
 interface Options {
   apiKey: string;
@@ -86,17 +107,27 @@ export class HttpAmcClient implements AmcClient {
         "suggestions",
         LocationSuggestionSchema,
       );
-      const first = suggestions.find((s) => s.location || (s.latitude != null && s.longitude != null));
-      if (!first) return [];
-      const lat = first.location?.latitude ?? first.latitude!;
-      const lng = first.location?.longitude ?? first.longitude!;
-      const theatres = await this.getAllPages(
-        ENDPOINTS.closestTheatres(lat, lng),
-        "theatres",
-        TheatreSchema,
-        1, // the closest list is already sorted, so the first page is enough
-      );
-      return theatres.map(normalizeTheatre);
+      const coords = new Map<string, { lat: number; lng: number }>();
+      for (const s of suggestions) {
+        const c = suggestionCoords(s);
+        if (c) coords.set(`${c.lat},${c.lng}`, c);
+        if (coords.size >= MAX_SUGGESTIONS) break;
+      }
+      const byId = new Map<number, Theatre>();
+      for (const { lat, lng } of coords.values()) {
+        const locations = await this.getAllPages(
+          ENDPOINTS.locations(lat, lng),
+          "locations",
+          LocationSchema,
+          1, // already sorted by distance, so the first page is enough
+          THEATRES_PER_SUGGESTION,
+        );
+        for (const l of locations) {
+          const t = normalizeTheatre(l._embedded.theatre);
+          if (!byId.has(t.id)) byId.set(t.id, t);
+        }
+      }
+      return [...byId.values()];
     });
   }
 
@@ -130,17 +161,18 @@ export class HttpAmcClient implements AmcClient {
     key: string,
     item: T,
     maxPages = 20,
+    pageSize = this.pageSize,
   ): Promise<z.infer<T>[]> {
     const schema = pageSchema(key, item);
     const out: z.infer<T>[] = [];
     for (let page = 1; page <= maxPages; page++) {
       const sep = path.includes("?") ? "&" : "?";
-      const json = await this.request(`${path}${sep}page-number=${page}&page-size=${this.pageSize}`);
+      const json = await this.request(`${path}${sep}page-number=${page}&page-size=${pageSize}`);
       const parsed = schema.parse(json);
       const items = (parsed._embedded?.[key] ?? []) as z.infer<T>[];
       out.push(...items);
       const total = parsed.count ?? items.length;
-      if (items.length === 0 || out.length >= total || items.length < this.pageSize) break;
+      if (items.length === 0 || out.length >= total || items.length < pageSize) break;
     }
     return out;
   }
